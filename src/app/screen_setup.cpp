@@ -306,7 +306,7 @@ public:
         if (badge_focus_) { // the title bar's update badge
             if (m.vertical() > 0) badge_focus_ = false;
             else if (m.pressed(PadButton::Cross)) updates().open_dialog();
-            if (m.pressed(PadButton::Triangle)) app.quit();
+            if (m.pressed(PadButton::Triangle)) back(app);
             return;
         }
         if (int v = m.vertical(); v < 0 && badge && sel_ < cols_) { // up from the top row
@@ -323,8 +323,7 @@ public:
             follow_sel_ = true;
         }
         if (m.pressed(PadButton::Triangle)) {
-            if (developer_) app.pop();
-            else app.quit();
+            back(app);
             return;
         }
         if (!m.pressed(PadButton::Cross) && !tapped_) return;
@@ -417,6 +416,16 @@ public:
     bool update_prompts() const override { return !developer_; }
 
 private:
+    // Triangle (Esc, Android's back): the developer page goes back to this menu; this menu goes
+    // back to the game's title menu when a disc is loaded (the GT3R menu button on the title
+    // menu left it for here), otherwise it quits.
+    void back(App& app) {
+        if (developer_) return app.pop();
+        if (app.vfs())
+            for (const ScreenEntry& e : screen_registry())
+                if (std::string_view(e.id) == "gt3menu") return app.push(e.factory());
+        app.quit();
+    }
     UiRect badge_; // the update badge (last frame's)
     bool badge_pressed_ = false, badge_focus_ = false;
     struct Item {
