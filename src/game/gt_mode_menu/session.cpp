@@ -90,6 +90,31 @@ SaveLibrary& save_library() {
     return *ms.library;
 }
 
+int set_save_folder(const std::string& dir) {
+    const std::string from = SaveLibrary::user_dir();
+    SaveLibrary::set_user_dir(dir);
+    if (const char* p = std::getenv("GT3R_GTMODE_SAVE"); p && *p) return 0; // tests: their own file
+    MenuState& ms = menu_state();
+    ms.library.reset();
+    SaveLibrary& lib = save_library();
+    if (lib.dir() == from || !saving_enabled()) return 0;
+    const int n = lib.import_missing(from);
+    GtModeSession* s = ms.session.get();
+    const std::string old = s ? s->save_path() : std::string();
+    if (s && old.compare(0, from.size(), from) == 0) {
+        const std::string name = old.substr(from.size());
+        std::string to = lib.dir() + name;
+        if (host_path_exists(to) && read_host_file(to) != read_host_file(old))
+            to = lib.path_for(name.size() > 4 ? name.substr(0, name.size() - 4) : name);
+        s->set_save_path(to);
+        std::string err;
+        if (s->save(&err)) lib.set_current(to);
+        else LOG_WARN("gt mode: cannot save into %s: %s", to.c_str(), err.c_str());
+    }
+    LOG_INFO("gt mode: saves now in %s (%d copied from %s)", lib.dir().c_str(), n, from.c_str());
+    return n;
+}
+
 std::string current_save_path() {
     if (const char* p = std::getenv("GT3R_GTMODE_SAVE"); p && *p) return p;
     SaveLibrary& lib = save_library();

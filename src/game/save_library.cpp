@@ -15,6 +15,11 @@ namespace {
 
 constexpr const char* kCurrentFile = "current.txt";
 
+std::string& chosen_user_dir() {
+    static std::string dir;
+    return dir;
+}
+
 std::string with_sep(std::string d) {
     if (!d.empty() && d.back() != '/' && d.back() != '\\') d += '/';
     return d;
@@ -56,7 +61,12 @@ std::string cut(std::string s, size_t n) {
 
 SaveLibrary::SaveLibrary(std::string dir, bool tracked) : dir_(with_sep(std::move(dir))), tracked_(tracked) {}
 
-std::string SaveLibrary::user_dir() { return user_data_dir() + "saves/"; }
+std::string SaveLibrary::user_dir() {
+    const std::string& d = chosen_user_dir();
+    return d.empty() ? user_data_dir() + "saves/" : with_sep(d);
+}
+
+void SaveLibrary::set_user_dir(std::string dir) { chosen_user_dir() = std::move(dir); }
 std::string SaveLibrary::legacy_path() { return user_data_dir() + "gtmode.sav"; }
 
 int SaveLibrary::migrate(const std::string& legacy) {
@@ -74,6 +84,24 @@ int SaveLibrary::migrate(const std::string& legacy) {
         if (!SDL_CopyFile(from.c_str(), to.c_str())) continue;
         if (n++ == 0 && tracked_) set_current(to);
     }
+    return n;
+}
+
+int SaveLibrary::import_missing(const std::string& from) {
+    const std::string src = with_sep(from);
+    if (same_file(src, dir_) || !host_is_directory(src)) return 0;
+    SDL_CreateDirectory(dir_.c_str());
+    int n = 0, count = 0;
+    if (char** names = SDL_GlobDirectory(src.c_str(), "*.sav", SDL_GLOB_CASEINSENSITIVE, &count)) {
+        for (int i = 0; i < count; ++i) {
+            std::string a = src + names[i], b = dir_ + names[i];
+            if (host_is_directory(a) || host_path_exists(b)) continue;
+            if (SDL_CopyFile(a.c_str(), b.c_str())) ++n;
+        }
+        SDL_free(names);
+    }
+    if (tracked_ && !host_path_exists(dir_ + kCurrentFile) && host_path_exists(src + kCurrentFile))
+        SDL_CopyFile((src + kCurrentFile).c_str(), (dir_ + kCurrentFile).c_str());
     return n;
 }
 

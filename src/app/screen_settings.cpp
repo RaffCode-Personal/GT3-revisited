@@ -10,10 +10,13 @@
 #include "app/updates.h"
 
 #include "base/file.h"
+#include "game/gt_mode_menu.h"
+#include "game/save_library.h"
 #include "menu/flow/menu_sound.h"
 #include "net/session.h"
 #include "platform/recent_discs.h"
 #include "platform/render_scale.h"
+#include "platform/shared_storage.h"
 
 #include <algorithm>
 #include <cmath>
@@ -165,6 +168,7 @@ public:
     }
 
     void update(App& app, double) override {
+        if (tab_ == kDisc) poll_shared_storage(app);
         build(app);
         const MenuInput& m = app.menu();
         if (m.pressed(PadButton::Triangle)) {
@@ -923,6 +927,8 @@ private:
         if (!app.last_error().empty() && !app.failed_disc_path().empty())
             info("Last error", app.last_error(), elide_middle(app.failed_disc_path(), 77));
 
+        build_saves(app);
+
         heading("Startup");
         bool hub = to_lower(cfg.get("app", "start").value_or("")) == "hub";
         choice("Start in", "Game: opening movie and title menu. Developer options: the tools list.",
@@ -931,6 +937,66 @@ private:
                    a->save_config();
                });
         info("Settings file", app.data_dir() + "config.ini");
+    }
+
+    // Where the GT-mode saves live ([storage] saves_dir; game::set_save_folder). Android: a
+    // switch moves them to the shared storage, which an uninstall or "Clear storage" leaves
+    // alone and a file manager or a computer over USB can reach.
+    void build_saves(App& app) {
+        heading("Saves");
+        if (platform::shared_storage_supported()) {
+            const bool on = !app.config().get("storage", "saves_dir").value_or("").empty();
+            std::string desc =
+                saves_pending_ ? "Allow \"All files access\" for GT3 Revisited in the screen that opened, then come back."
+                : on && !saves_access_
+                    ? "No storage access (revoked in Android's settings): saves go to the app's own folder. Turn "
+                      "this off and on to allow it again."
+                : on ? "Saves outlive an uninstall or Clear storage. Copy them with a file manager or over USB."
+                     : "Keep saves in a GT3Revisited folder on the phone's storage, where an uninstall leaves them. "
+                       "Needs \"All files access\".";
+            App* a = &app;
+            toggle("Saves in shared storage", desc, on || saves_pending_, [this, a](bool v) {
+                if (!v) {
+                    saves_pending_ = false;
+                    use_saves_folder(*a, "");
+                } else if (platform::shared_storage_dir().empty()) {
+                    saves_note_ = "The phone's shared storage is not available.";
+                } else if (platform::shared_storage_access()) {
+                    use_saves_folder(*a, platform::shared_storage_dir() + "saves/");
+                } else {
+                    saves_pending_ = true;
+                    platform::request_shared_storage_access();
+                }
+            });
+        }
+        info("Saves folder", game::SaveLibrary::user_dir(),
+             saves_note_.empty() && !platform::shared_storage_supported()
+                 ? "Another folder: [storage] saves_dir in the settings file (then restart)."
+                 : saves_note_);
+    }
+
+    // Moves the saves to `dir` ("" = the app's own folder) and remembers it.
+    void use_saves_folder(App& app, const std::string& dir) {
+        app.config().set("storage", "saves_dir", dir);
+        app.save_config();
+        int n = game::set_save_folder(dir);
+        saves_note_ = n > 0 ? "Copied " + std::to_string(n) + (n == 1 ? " save" : " saves") +
+                                  " from the previous folder (left there too)."
+                            : "";
+    }
+
+    // Checks the storage access twice a second (the player grants it in another screen) and
+    // finishes turning the switch on once it is there.
+    void poll_shared_storage(App& app) {
+        if (!platform::shared_storage_supported()) return;
+        const Uint64 now = SDL_GetTicks();
+        if (saves_checked_ms_ && now - saves_checked_ms_ < 500) return;
+        saves_checked_ms_ = now;
+        saves_access_ = platform::shared_storage_access();
+        if (saves_pending_ && saves_access_) {
+            saves_pending_ = false;
+            use_saves_folder(app, platform::shared_storage_dir() + "saves/");
+        }
     }
 
     // The update check (app/updates.h) and the relay server it asks.
@@ -1120,6 +1186,10 @@ private:
     bool focus_tabs_ = false;
     bool preview_ = false;
     bool se_tried_ = false;
+    bool saves_pending_ = false; // waiting for the player to allow shared storage access
+    bool saves_access_ = false;
+    Uint64 saves_checked_ms_ = 0;
+    std::string saves_note_;
     Gesture gesture_;
     Press press_;
     Layout lay_;

@@ -140,6 +140,15 @@ Settings, saves, replays, mods and screenshots live in:
 If a `portable.ini` file sits next to the executable, all user data is kept
 beside it instead.
 
+The saves can live elsewhere: `[storage] saves_dir = <folder>` in `config.ini`.
+On Android the app's private storage is erased by an uninstall or **Clear
+storage**, so **Settings → Game disc → Saves in shared storage** moves them to
+`GT3Revisited/saves/` on the phone's storage, where a file manager or a
+computer over USB can reach them and an uninstall leaves them. It needs
+Android's "All files access" for the app. Turning it on or off copies the saves
+the new folder does not have yet; nothing is overwritten or deleted. After a
+reinstall, turn it on again to pick the saves up.
+
 | In the folder | |
 |---|---|
 | `config.ini` | settings (below) |

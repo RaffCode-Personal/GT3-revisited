@@ -39,8 +39,12 @@ public:
     // current save is remembered in current.txt (off for GT3R_GTMODE_SAVE).
     explicit SaveLibrary(std::string dir, bool tracked = true);
     // <user data>/saves/ (the user data folder: SDL_GetPrefPath, or the executable's
-    // folder in portable mode).
+    // folder in portable mode), or the folder set_user_dir chose.
     static std::string user_dir();
+    // The folder user_dir() returns from now on ("" = <user data>/saves/). The app sets it
+    // from [storage] saves_dir (Settings: a folder the player can reach, e.g. Android's
+    // shared storage, which an uninstall leaves alone).
+    static void set_user_dir(std::string dir);
     // The single save of earlier versions: <user data>/gtmode.sav.
     static std::string legacy_path();
 
@@ -49,6 +53,11 @@ public:
     // and its second slot (<legacy stem>_2.sav) are copied in (the first one becomes the
     // current save). Returns the number of saves copied.
     int migrate(const std::string& legacy);
+
+    // Copies in the saves of the folder `from` this library does not have: each *.sav whose
+    // file name is free here, and current.txt when this library has none. Nothing is
+    // overwritten or deleted. Returns the number of saves copied.
+    int import_missing(const std::string& from);
 
     // Every *.sav in the folder, newest first.
     std::vector<SaveInfo> list() const;

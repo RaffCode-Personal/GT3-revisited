@@ -1,8 +1,13 @@
 package org.gt3revisited.gt3r;
 
+import android.Manifest;
+import android.content.ActivityNotFoundException;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Environment;
+import android.provider.Settings;
 import android.util.Log;
 import android.view.DisplayCutout;
 import android.view.RoundedCorner;
@@ -10,6 +15,8 @@ import android.view.View;
 import android.view.WindowInsets;
 
 import org.libsdl.app.SDLActivity;
+
+import java.io.File;
 
 /** Hosts the native engine. SDL is statically linked into libmain.so. */
 public class GT3Activity extends SDLActivity {
@@ -63,5 +70,39 @@ public class GT3Activity extends SDLActivity {
             }
         }
         return out;
+    }
+
+    /**
+     * Called from native code (src/platform/shared_storage.cpp): the GT3Revisited
+     * folder on the shared storage (what a file manager shows as the phone's
+     * internal storage), for saves that outlive an uninstall; null when the
+     * storage is not mounted.
+     */
+    public String sharedStorageDir() {
+        if (!Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState())) return null;
+        return new File(Environment.getExternalStorageDirectory(), "GT3Revisited").getAbsolutePath();
+    }
+
+    /** Whether files can be written there: "All files access" on Android 11+, the storage permission before. */
+    public boolean hasSharedStorageAccess() {
+        if (Build.VERSION.SDK_INT >= 30) return Environment.isExternalStorageManager();
+        return checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    /** Android 11+: opens the system's "All files access" switch for this app (native code polls the result). */
+    public void requestSharedStorageAccess() {
+        if (Build.VERSION.SDK_INT < 30) return; // native code asks for the storage permission
+        runOnUiThread(() -> {
+            try {
+                startActivity(new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                                         Uri.parse("package:" + getPackageName())));
+            } catch (ActivityNotFoundException e) {
+                try {
+                    startActivity(new Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION));
+                } catch (ActivityNotFoundException e2) {
+                    Log.w("GT3R", "No screen for All files access", e2);
+                }
+            }
+        });
     }
 }

@@ -124,6 +124,11 @@ bool ensure_gt_mode_session(const std::function<std::optional<Bytes>(const std::
 // earlier versions migrated on first use) and the save to play: GT3R_GTMODE_SAVE, the
 // remembered current save, the newest save, or <library>/gtmode.sav for a new game.
 SaveLibrary& save_library();
+// Moves the save library to the folder `dir` ("" = <user data>/saves/; SaveLibrary::set_user_dir).
+// The saves of the old folder the new one does not have are copied in (none overwritten or
+// deleted) and the running game goes on in the new folder: in its copy, or in a file of its
+// own when a different save there has its file name. Returns the number of saves copied.
+int set_save_folder(const std::string& dir);
 std::string current_save_path();
 // The next save page in SaveGame mode saves `s` instead of the running game (e.g. a
 // championship between rounds, with the round just finished), and the running game and

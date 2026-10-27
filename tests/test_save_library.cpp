@@ -142,6 +142,39 @@ TEST(save_library_operations) {
     fs::remove_all(root);
 }
 
+// Another saves folder (Settings: Android's shared storage): the saves the new folder lacks are
+// copied in, none overwritten or deleted, and current.txt only when the new folder has none.
+TEST(save_library_change_folder) {
+    const fs::path root = fresh_dir("gt3r_test_lib_folder");
+    const std::string from = (root / "app").string(), to = (root / "shared").string();
+    SaveLibrary old(from);
+    std::string a, b;
+    CHECK(old.create(make_game(100), "ONE", &a) && old.create(make_game(200), "TWO", &b) && old.set_current(b));
+    fs::create_directories(to);
+    CHECK(write_save(to + "/TWO.sav", make_game(999, "TWO")));
+    SaveLibrary lib(to);
+    CHECK(lib.import_missing(from) == 1);
+    CHECK(read_save(lib.dir() + "ONE.sav")->credits == 100 && read_save(lib.dir() + "TWO.sav")->credits == 999);
+    CHECK(lib.current() == lib.dir() + "TWO.sav" && old.list().size() == 2); // the old folder is left as it was
+    CHECK(lib.import_missing(from) == 0 && lib.import_missing(to) == 0);
+    CHECK(lib.import_missing((root / "missing").string()) == 0);
+
+    // set_save_folder: the library moves (user_dir follows) and copies what it lacks.
+    set_env("GT3R_GTMODE_SAVE", "");
+    reset_gt_mode_menu_for_tests();
+    const std::string fresh = (root / "fresh").string();
+    SaveLibrary::set_user_dir(from);
+    CHECK(save_library().dir() == from + "/");
+    CHECK(set_save_folder(fresh) == 2);
+    CHECK(SaveLibrary::user_dir() == fresh + "/" && save_library().dir() == fresh + "/");
+    CHECK(save_library().list().size() == 2 && save_library().current() == fresh + "/TWO.sav");
+    CHECK(set_save_folder(fresh) == 0);
+    SaveLibrary::set_user_dir("");
+    CHECK(SaveLibrary::user_dir() == user_data_dir() + "saves/");
+    reset_gt_mode_menu_for_tests();
+    fs::remove_all(root);
+}
+
 // A save that exists but cannot be read (damaged, from a newer version) is never written
 // over: the session moves it aside before its new game autosaves to the path, every failure
 // keeps its own copy, and the library does not list the copies. No disc: a session's new

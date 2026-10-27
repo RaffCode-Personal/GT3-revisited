@@ -6,9 +6,11 @@
 #include "base/log.h"
 #include "gt3r_version.h"
 #include "formats/png_writer.h"
+#include "game/save_library.h"
 #include "platform/recent_discs.h"
 #include "platform/render_scale.h"
 #include "platform/mac_layer.h"
+#include "platform/shared_storage.h"
 
 #include <algorithm>
 #include <cmath>
@@ -71,6 +73,16 @@ bool App::init(int argc, char** argv) {
     config_path_ = data_dir_ + "config.ini";
     if (auto cfg = IniDocument::load(config_path_)) config_ = std::move(*cfg);
     LOG_INFO("User data: %s", data_dir_.c_str());
+    // [storage] saves_dir: the GT-mode saves' folder (Settings > Game disc > Saves; default
+    // <user data>/saves/). On Android a folder on the shared storage needs All files access:
+    // without it (revoked in the system settings) the saves stay in the app's own folder
+    // until the setting is turned on again.
+    if (std::string dir = config_.get("storage", "saves_dir").value_or(""); !dir.empty()) {
+        if (platform::shared_storage_supported() && !platform::shared_storage_access())
+            LOG_WARN("Saves folder %s: no storage access, using %s", dir.c_str(), game::SaveLibrary::user_dir().c_str());
+        else
+            game::SaveLibrary::set_user_dir(dir);
+    }
 
     SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight"); // mobile: racing is landscape
     // macOS: the menu bar (and the title bar's green button) appears at the top of the screen in

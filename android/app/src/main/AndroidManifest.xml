@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:installLocation="auto">
 
     <uses-feature android:glEsVersion="0x00030000" />
@@ -14,11 +15,22 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- Online battle (UDP; docs/dev/ONLINE.md) -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Saves in shared storage (Settings > Game disc > Saves; src/platform/shared_storage.h), so
+         they outlive an uninstall: All files access on Android 11+, the storage permission
+         before (with requestLegacyExternalStorage on Android 10). Only asked for when the
+         player turns that setting on. -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="29" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="29" />
 
     <application
         android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="true"
+        android:requestLegacyExternalStorage="true"
         android:theme="@style/AppTheme"
         android:hardwareAccelerated="true"
         android:isGame="true"
