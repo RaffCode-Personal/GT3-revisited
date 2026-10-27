@@ -609,17 +609,20 @@ void RaceScreen::render_drive(App& app, Ui& ui) {
     SDL_FRect rect2{0, 0, 0, 0}, half1{}, half2{};
     bool horizontal = split_horizontal(app);
     if (split) {
-        float W = float(Ui::kWidth), H = float(Ui::kHeight);
+        // With the 4:3 aspect (App::four_three) the halves share the 4:3 box.
+        const bool box = app.four_three();
+        float X = box ? float(Ui::kFrame43X) : 0.0f, W = box ? float(Ui::kFrame43W) : float(Ui::kWidth);
+        float H = float(Ui::kHeight);
         if (horizontal) {
-            half1 = rect = {0, 0, W, H / 2};
-            half2 = rect2 = {0, H / 2, W, H / 2};
+            half1 = rect = {X, 0, W, H / 2};
+            half2 = rect2 = {X, H / 2, W, H / 2};
         } else {
-            half1 = {0, 0, W / 2, H};
-            half2 = {W / 2, 0, W / 2, H};
-            rect = {0, H / 6, W / 2, 8 * H / 11};
-            rect2 = {W / 2, H / 6, W / 2, 8 * H / 11};
+            half1 = {X, 0, W / 2, H};
+            half2 = {X + W / 2, 0, W / 2, H};
+            rect = {X, H / 6, W / 2, 8 * H / 11};
+            rect2 = {X + W / 2, H / 6, W / 2, 8 * H / 11};
         }
-        ui.fill(0, 0, W, H, Color{0, 0, 0, 255});
+        ui.fill(0, 0, float(Ui::kWidth), H, Color{0, 0, 0, 255});
     }
     if (frame43_ && !split) {
         // The original's 4:3 frame, pillarboxed; with original_res_ at its 640x448 internal size.

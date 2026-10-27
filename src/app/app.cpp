@@ -701,9 +701,9 @@ void App::layout_ui(bool adaptive, bool game_frame) {
     SDL_GetRenderLogicalPresentation(renderer_, &cur_w, &cur_h, &cur_mode);
     four_three_ = false;
     if (!adaptive || pw < 160 || ph < 90 || ww <= 0 || wh <= 0) {
-        // [video] aspect: the 4:3 box of the 640x360 space. The logical size is the box and the
-        // viewport starts kFrame43X units left of it, so screens keep drawing (and SDL keeps
-        // mapping input) in 640x360 units.
+        // [video] aspect: the 4:3 box of the 640x360 space. The logical size is (about) the box
+        // and the viewport starts left of it, so screens keep drawing (and SDL keeps mapping
+        // input) in 640x360 units.
         if (game_frame && !adaptive && pw > 0 && ph > 0) {
             const std::string a = aspect();
             four_three_ = a == "4:3" || (a == "auto" && pw * 2 < ph * 3);
@@ -711,10 +711,15 @@ void App::layout_ui(bool adaptive, bool game_frame) {
 #if GT3R_XR
         if (xr_) four_three_ = false; // the virtual screen is 16:9
 #endif
-        const int lw = four_three_ ? Ui::kFrame43W : Ui::kWidth;
+        // SDL rounds the viewport's pixel offset (-x0 x scale) and a clip rectangle's pixel
+        // position (x x scale) down separately, so a clip at x = x0 would become a scissor at
+        // x = -1, which Vulkan does not allow (phones dropped those draws). The window therefore
+        // starts 1 unit left of the box (and ends 1 unit right of it, black), so clips at the
+        // box's edge stay a few pixels inside.
+        const int lw = four_three_ ? Ui::kFrame43W + 2 : Ui::kWidth;
         if (cur_w != lw || cur_h != Ui::kHeight || cur_mode != SDL_LOGICAL_PRESENTATION_LETTERBOX)
             SDL_SetRenderLogicalPresentation(renderer_, lw, Ui::kHeight, SDL_LOGICAL_PRESENTATION_LETTERBOX);
-        const SDL_Rect box{-Ui::kFrame43X, 0, Ui::kWidth, Ui::kHeight};
+        const SDL_Rect box{-(Ui::kFrame43X - 1), 0, Ui::kWidth, Ui::kHeight};
         SDL_SetRenderViewport(renderer_, four_three_ ? &box : nullptr);
         if (ui_) ui_->set_layout(Ui::kWidth, Ui::kHeight, {0, 0, Ui::kWidth, Ui::kHeight}, touch_ui_);
         return;
