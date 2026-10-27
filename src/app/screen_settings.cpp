@@ -434,6 +434,16 @@ private:
         else
             info("Fullscreen", "Always on this device");
 
+        static const char* const kAspects[] = {"auto", "16:9", "4:3"};
+        const std::string aspect = app.aspect();
+        int aidx = 0;
+        for (int i = 0; i < 3; ++i)
+            if (aspect == kAspects[i]) aidx = i;
+        choice("Aspect ratio",
+               "Shape of the game's picture. 4:3 fills tablets and unfolded foldables, like the original; "
+               "Auto: 4:3 on screens narrower than 3:2, otherwise 16:9.",
+               {"Auto", "16:9", "4:3"}, aidx, [a](int i) { a->set_aspect(kAspects[i]); });
+
         bool vsync = cfg.get("video", "vsync").value_or("1") != "0";
         toggle("VSync", "Wait for the display refresh: no tearing. Off: lower input latency.", vsync, [a](bool v) {
             a->config().set("video", "vsync", v ? "1" : "0");

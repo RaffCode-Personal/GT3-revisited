@@ -187,6 +187,8 @@ public:
         }
     }
 
+    bool game_frame() const override { return true; }
+
     void render(App& app, Ui& ui) override {
         if (!flow_) {
             ui.header("GAME MENUS", "");
@@ -227,10 +229,11 @@ public:
 
 private:
     // The "GT3R menu" button, in the left bar beside the 4:3 picture (UI units); above the
-    // on-screen D-pad while the touch controls are up, so a finger reaches it.
+    // on-screen D-pad while the touch controls are up, so a finger reaches it. With the 4:3
+    // aspect there is no bar: the picture's bottom-left corner.
     static UiRect gt3r_menu_button(App& app) {
-        const TouchRect r =
-            app.touch().clear_above({6, Ui::kHeight - 46, (Ui::kWidth - Ui::kHeight * 4.0f / 3.0f) / 2 - 12, 22});
+        const float x = app.four_three() ? Ui::kFrame43X + 6.0f : 6.0f;
+        const TouchRect r = app.touch().clear_above({x, Ui::kHeight - 46, Ui::kFrame43X - 12.0f, 22});
         return {r.x, r.y, r.w, r.h};
     }
 

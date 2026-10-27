@@ -207,6 +207,7 @@ public:
     void on_event(App& app, const SDL_Event& e) override;
     // Phones: driving touch controls while racing, menu controls otherwise.
     TouchLayout touch_layout() const override;
+    bool game_frame() const override { return true; }
     void render(App& app, Ui& ui) override;
 
 private:
@@ -663,6 +664,9 @@ private:
     int sun_log_ = 0;
     Billboards billboards_;
     bool original_res_ = false, original_nearest_ = true;
+    // The 3D view and HUD in the 4:3 frame: original_res_, or the 4:3 aspect (App::four_three) at
+    // full resolution. Set each frame by render_drive.
+    bool frame43_ = false;
     double script_time_ = 0;
     double leave_clock_ = 0; // preset leave: seconds since the finish
     std::optional<BestLicense> best_license_; // the best finished licence run of this visit

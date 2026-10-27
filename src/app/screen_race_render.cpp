@@ -66,7 +66,7 @@ void RaceScreen::draw_mirror(App& app, Ui& ui, const SDL_FRect& frame, const ren
     if (half) {
         float k = frame.w / 640.0f, ky = frame.h / 224.0f;
         mr = {frame.x + fx * k, frame.y + 16 * ky, fw * k, 55 * ky};
-    } else if (original_res_) {
+    } else if (frame43_) {
         float k = frame.w / 640.0f, ky = frame.h / 448.0f;
         mr = {frame.x + fx * k, frame.y + fy * ky, fw * k, fh * ky};
     } else {
@@ -567,6 +567,7 @@ render::DrawOptions RaceScreen::draw_options() const {
 }
 
 void RaceScreen::render_drive(App& app, Ui& ui) {
+    frame43_ = original_res_ || app.four_three();
     app.note_race_scale();
     upload_course_animations(); // once per frame
     float mh = float(Ui::kHeight), mw = mh * 4.0f / 3.0f;
@@ -620,13 +621,15 @@ void RaceScreen::render_drive(App& app, Ui& ui) {
         }
         ui.fill(0, 0, W, H, Color{0, 0, 0, 255});
     }
-    if (original_res_ && !split) {
-        // The original's frame: 640x448 internal, 4:3, pillarboxed.
+    if (frame43_ && !split) {
+        // The original's 4:3 frame, pillarboxed; with original_res_ at its 640x448 internal size.
         float H = float(Ui::kHeight), W = H * 4.0f / 3.0f;
         ui.fill(0, 0, float(Ui::kWidth), H, Color{0, 0, 0, 255});
         rect = {(float(Ui::kWidth) - W) / 2, 0, W, H};
-        o.fixed_width = 640, o.fixed_height = 448;
-        o.nearest = original_nearest_;
+        if (original_res_) {
+            o.fixed_width = 640, o.fixed_height = 448;
+            o.nearest = original_nearest_;
+        }
     }
     frame_rect_ = rect;
     Uint64 t0 = SDL_GetPerformanceCounter();
@@ -696,7 +699,7 @@ void RaceScreen::render_drive(App& app, Ui& ui) {
     log_perf(false);
 
     if (logger_mode_) { // the Analyzer over the replay (or its graph over everything)
-        SDL_FRect dst = original_res_ ? frame_rect_ : SDL_FRect{(float(Ui::kWidth) - mw) / 2, 0, mw, mh};
+        SDL_FRect dst = frame43_ ? frame_rect_ : SDL_FRect{(float(Ui::kWidth) - mw) / 2, 0, mw, mh};
         if (analyzer_.view() == Analyzer::View::Graph) {
             ui.fill(0, 0, float(Ui::kWidth), float(Ui::kHeight), Color{0, 0, 0, 255});
         } else { // the bottom band (bg 0..212, indicator_back 0..148) across a wide screen too
@@ -713,7 +716,7 @@ void RaceScreen::render_drive(App& app, Ui& ui) {
         // Replays and the attract demo (presentation §G): the mark on its timer, in replays only
         // while no ITEM is on, in the attract demo always; the REPLAY OPTIONS items and the title.
         if (attract_ || !replay_settings_.items)
-            hud_.draw_replay_mark(ui.renderer(), mark_timer_.alpha(), original_res_ ? &rect : nullptr, original_res_);
+            hud_.draw_replay_mark(ui.renderer(), mark_timer_.alpha(), frame43_ ? &rect : nullptr, frame43_);
         if (!attract_) draw_replay_items(app, ui, rect);
     } else if (preset_.hud) {
         HudData d = hud_data(0);
@@ -726,7 +729,7 @@ void RaceScreen::render_drive(App& app, Ui& ui) {
         } else {
             // Under the results panel: all but the lap / time block, drawn over it below.
             if (results_panel_up()) d.layer = 1;
-            if (original_res_) { // the HUD in the 4:3 frame
+            if (frame43_) { // the HUD in the 4:3 frame
                 d.four_three = true;
                 hud_.draw(ui.renderer(), d, &rect);
             } else {
@@ -772,7 +775,7 @@ void RaceScreen::render_drive(App& app, Ui& ui) {
             if (preset_.hud && results_panel_up()) {
                 HudData d = hud_data(0);
                 d.layer = 2;
-                if (original_res_) {
+                if (frame43_) {
                     d.four_three = true;
                     hud_.draw(ui.renderer(), d, &frame_rect_);
                 } else {

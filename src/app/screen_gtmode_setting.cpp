@@ -104,6 +104,8 @@ public:
         }
     }
 
+    bool game_frame() const override { return true; }
+
     void render(App& app, Ui& ui) override {
         if (!flow_) {
             ui.header("CAR SETTINGS", "");

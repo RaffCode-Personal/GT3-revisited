@@ -105,8 +105,8 @@ void RaceScreen::draw_replay_items(App& app, Ui& ui, const SDL_FRect& rect) {
     d.live = false;
     d.wrong_way = d.auto_drive = false;
     d.countdown = d.finish_t = -1;
-    d.four_three = original_res_;
-    const SDL_FRect* vp = original_res_ ? &rect : nullptr;
+    d.four_three = frame43_;
+    const SDL_FRect* vp = frame43_ ? &rect : nullptr;
     if (const u8 it = replay_settings_.items) {
         HudData items = d;
         items.items = it;

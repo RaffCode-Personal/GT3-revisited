@@ -45,6 +45,9 @@ class Ui {
 public:
     static constexpr int kWidth = 640; // logical resolution of the game and tool screens
     static constexpr int kHeight = 360;
+    // The 4:3 box in the middle of the 640x360 space, where the game draws its own 4:3 picture.
+    static constexpr int kFrame43W = kHeight * 4 / 3;
+    static constexpr int kFrame43X = (kWidth - kFrame43W) / 2;
     // Height of a line of text: text(x, y) puts capitals in y .. y + kChar
     // (descenders reach ~2 units lower). Also the debug font's glyph width;
     // measure proportional text with text_width().

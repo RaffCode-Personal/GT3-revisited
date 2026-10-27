@@ -162,7 +162,7 @@ bool App::init(int argc, char** argv) {
         }
         SDL_SetRenderVSync(renderer_, gpu_opts.vsync ? 1 : 0);
     }
-    layout_ui(false);
+    layout_ui(false, false);
     LOG_INFO("Renderer: %s", SDL_GetRendererName(renderer_));
     if (limit_60fps()) apply_frame_limit();
     ui_ = std::make_unique<Ui>(renderer_);
@@ -325,6 +325,16 @@ void App::set_dynamic_resolution(bool on) {
     config_.set("video", "dynamic_start", ""), race_scale_ = 0; // a fresh start
     save_config();
     reset_dynamic_scale();
+}
+
+std::string App::aspect() const {
+    std::string v = to_lower(config_.get("video", "aspect").value_or("auto"));
+    return v == "16:9" || v == "4:3" ? v : "auto";
+}
+
+void App::set_aspect(const std::string& v) {
+    config_.set("video", "aspect", v);
+    save_config();
 }
 
 void App::apply_render_scale() {
@@ -514,11 +524,15 @@ SDL_AppResult App::iterate() {
 #if GT3R_XR
     if (xr_) SDL_SetRenderTarget(renderer_, xr_->canvas()); // the frame goes into the canvas
 #endif
-    layout_ui(!screens_.empty() && screens_.back()->adaptive_ui());
+    layout_ui(!screens_.empty() && screens_.back()->adaptive_ui(), !screens_.empty() && screens_.back()->game_frame());
     ui_->clear();
     Uint64 h_r0 = SDL_GetTicksNS();
     if (!screens_.empty()) screens_.back()->render(*this, *ui_);
     updates().dialog_render(*ui_);
+    if (four_three_) { // what the 16:9 layout draws past the 4:3 box would show in side bars
+        ui_->fill(0, 0, Ui::kFrame43X, Ui::kHeight, Color{0, 0, 0});
+        ui_->fill(Ui::kWidth - Ui::kFrame43X, 0, Ui::kFrame43X, Ui::kHeight, Color{0, 0, 0});
+    }
     Uint64 h_r1 = SDL_GetTicksNS();
     touch_.set_safe_area(safe_area_window());
     touch_.render(*ui_);
@@ -671,7 +685,7 @@ SDL_FRect App::safe_area_window() const {
     return r;
 }
 
-void App::layout_ui(bool adaptive) {
+void App::layout_ui(bool adaptive, bool game_frame) {
     int pw = 0, ph = 0, ww = 0, wh = 0;
     SDL_GetRenderOutputSize(renderer_, &pw, &ph);
     SDL_GetWindowSize(window_, &ww, &wh);
@@ -685,12 +699,27 @@ void App::layout_ui(bool adaptive) {
     int cur_w = 0, cur_h = 0;
     SDL_RendererLogicalPresentation cur_mode = SDL_LOGICAL_PRESENTATION_DISABLED;
     SDL_GetRenderLogicalPresentation(renderer_, &cur_w, &cur_h, &cur_mode);
+    four_three_ = false;
     if (!adaptive || pw < 160 || ph < 90 || ww <= 0 || wh <= 0) {
-        if (cur_w != Ui::kWidth || cur_h != Ui::kHeight || cur_mode != SDL_LOGICAL_PRESENTATION_LETTERBOX)
-            SDL_SetRenderLogicalPresentation(renderer_, Ui::kWidth, Ui::kHeight, SDL_LOGICAL_PRESENTATION_LETTERBOX);
+        // [video] aspect: the 4:3 box of the 640x360 space. The logical size is the box and the
+        // viewport starts kFrame43X units left of it, so screens keep drawing (and SDL keeps
+        // mapping input) in 640x360 units.
+        if (game_frame && !adaptive && pw > 0 && ph > 0) {
+            const std::string a = aspect();
+            four_three_ = a == "4:3" || (a == "auto" && pw * 2 < ph * 3);
+        }
+#if GT3R_XR
+        if (xr_) four_three_ = false; // the virtual screen is 16:9
+#endif
+        const int lw = four_three_ ? Ui::kFrame43W : Ui::kWidth;
+        if (cur_w != lw || cur_h != Ui::kHeight || cur_mode != SDL_LOGICAL_PRESENTATION_LETTERBOX)
+            SDL_SetRenderLogicalPresentation(renderer_, lw, Ui::kHeight, SDL_LOGICAL_PRESENTATION_LETTERBOX);
+        const SDL_Rect box{-Ui::kFrame43X, 0, Ui::kWidth, Ui::kHeight};
+        SDL_SetRenderViewport(renderer_, four_three_ ? &box : nullptr);
         if (ui_) ui_->set_layout(Ui::kWidth, Ui::kHeight, {0, 0, Ui::kWidth, Ui::kHeight}, touch_ui_);
         return;
     }
+    SDL_SetRenderViewport(renderer_, nullptr);
     // Integer pixel scale: about the 640x360 look on desktop; on phones the
     // 8 px font at ~12 dp (readable at arm's length, rows of ~9 mm).
     int s = std::max(1, int(std::lround(std::min(pw / 640.0f, ph / 360.0f))));
@@ -725,6 +754,9 @@ void App::draw_phone_mask() {
     SDL_RendererLogicalPresentation mode;
     SDL_GetRenderLogicalPresentation(renderer_, &lw, &lh, &mode);
     SDL_SetRenderLogicalPresentation(renderer_, 0, 0, SDL_LOGICAL_PRESENTATION_DISABLED);
+    SDL_Rect vp{};
+    const bool had_vp = SDL_RenderViewportSet(renderer_) && SDL_GetRenderViewport(renderer_, &vp);
+    SDL_SetRenderViewport(renderer_, nullptr); // the 4:3 box's offset (layout_ui)
     // Rounded corners (radius 113 px at 1080 px) and the punch-hole camera.
     const float k = float(ph) / 1080.0f, rad = 113 * k;
     SDL_SetRenderDrawColor(renderer_, 0, 0, 0, 255);
@@ -740,6 +772,7 @@ void App::draw_phone_mask() {
         float w = std::sqrt(std::max(0.0f, cr * cr - y * y));
         SDL_RenderLine(renderer_, cx - w, cy + y, cx + w, cy + y);
     }
+    SDL_SetRenderViewport(renderer_, had_vp ? &vp : nullptr);
     SDL_SetRenderLogicalPresentation(renderer_, lw, lh, mode);
 }
 
@@ -748,12 +781,24 @@ void App::save_screenshot(const std::string& path) {
     // window, side bars and touch controls included.
     int lw = 0, lh = 0;
     SDL_RendererLogicalPresentation mode = SDL_LOGICAL_PRESENTATION_DISABLED;
+    SDL_Rect vp{};
+    const bool had_vp = SDL_RenderViewportSet(renderer_) && SDL_GetRenderViewport(renderer_, &vp);
     if (phone_sim_) {
         SDL_GetRenderLogicalPresentation(renderer_, &lw, &lh, &mode);
         SDL_SetRenderLogicalPresentation(renderer_, 0, 0, SDL_LOGICAL_PRESENTATION_DISABLED);
+        SDL_SetRenderViewport(renderer_, nullptr);
     }
-    SDL_Surface* shot = SDL_RenderReadPixels(renderer_, nullptr);
-    if (phone_sim_) SDL_SetRenderLogicalPresentation(renderer_, lw, lh, mode);
+    // The 4:3 box: the viewport reaches past it (layout_ui), so read the logical presentation's
+    // pixels.
+    SDL_FRect lr{};
+    const SDL_Rect box = four_three_ && !phone_sim_ && SDL_GetRenderLogicalPresentationRect(renderer_, &lr)
+                             ? SDL_Rect{int(lr.x), int(lr.y), int(lr.w), int(lr.h)}
+                             : SDL_Rect{};
+    SDL_Surface* shot = SDL_RenderReadPixels(renderer_, box.w > 0 ? &box : nullptr);
+    if (phone_sim_) {
+        SDL_SetRenderViewport(renderer_, had_vp ? &vp : nullptr);
+        SDL_SetRenderLogicalPresentation(renderer_, lw, lh, mode);
+    }
     if (!shot) return;
     SDL_Surface* rgba = SDL_ConvertSurface(shot, SDL_PIXELFORMAT_RGBA32);
     SDL_DestroySurface(shot);
