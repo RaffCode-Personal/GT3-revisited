@@ -73,6 +73,14 @@ android {
     // committed. CI writes it from secrets; locally, set the same variables.
     def keystore = System.getenv('GT3R_KEYSTORE')
     signingConfigs {
+        // Fork-only: test builds signed with one fixed debug key, so each new APK installs
+        // over the last one (CI otherwise makes a new debug key per run).
+        testDebug {
+            storeFile file('test-debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
         if (keystore) {
             release {
                 storeFile file(keystore)
@@ -88,6 +96,7 @@ android {
         // phone), so debug APKs build the native code like the desktop default:
         // optimised with debug info. The APK itself stays debuggable.
         debug {
+            signingConfig signingConfigs.testDebug
             externalNativeBuild {
                 cmake {
                     arguments '-DCMAKE_BUILD_TYPE=RelWithDebInfo'
