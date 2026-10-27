@@ -6,9 +6,12 @@
 
 namespace gt3r {
 
-void Ui::clear() {
-    SDL_SetRenderDrawColor(r_, colors::kBackground.r, colors::kBackground.g, colors::kBackground.b, 255);
+void Ui::clear(bool game_frame) {
+    // The bars around the letterboxed UI are black, like the game's own; our screens get their
+    // background colour inside the UI area.
+    SDL_SetRenderDrawColor(r_, 0, 0, 0, 255);
     SDL_RenderClear(r_);
+    if (!game_frame) fill(0, 0, w_, h_, colors::kBackground);
 }
 
 namespace {

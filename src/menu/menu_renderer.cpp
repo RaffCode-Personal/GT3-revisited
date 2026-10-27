@@ -1,6 +1,7 @@
 #include "menu/menu_renderer.h"
 
 #include "menu/menu_text.h"
+#include "render/clip.h"
 #include "text/game_font.h"
 
 #include <algorithm>
@@ -135,7 +136,7 @@ void MenuRenderer::draw_elements(const std::vector<ElementDraw>& list, const Ren
     bool had_clip = SDL_RenderClipEnabled(r_);
     SDL_GetRenderClipRect(r_, &old_clip);
     SDL_Rect clip{int(dst.x), int(dst.y), int(dst.w + 0.5f), int(dst.h + 0.5f)};
-    SDL_SetRenderClipRect(r_, &clip);
+    render::clip_set(r_, clip);
     SDL_SetRenderDrawBlendMode(r_, SDL_BLENDMODE_BLEND);
     for (const ElementDraw& d : list) {
         if (d.alpha <= 0.0f) continue;
@@ -145,7 +146,7 @@ void MenuRenderer::draw_elements(const std::vector<ElementDraw>& list, const Ren
                        int(d.clip.w * sx + 0.5f), int(d.clip.h * sy + 0.5f)};
             SDL_Rect both;
             if (!SDL_GetRectIntersection(&c, &clip, &both)) continue;
-            SDL_SetRenderClipRect(r_, &both);
+            render::clip_set(r_, both);
         }
         if (d.kind != ElementDraw::Kind::Element) draw_effect(d, dst);
         else if (d.element) {
@@ -153,9 +154,9 @@ void MenuRenderer::draw_elements(const std::vector<ElementDraw>& list, const Ren
             draw_element(*d.element, textures_for(d.scene), d, ro, dst);
             drawing_ = nullptr;
         }
-        if (d.has_clip) SDL_SetRenderClipRect(r_, &clip);
+        if (d.has_clip) render::clip_set(r_, clip);
     }
-    SDL_SetRenderClipRect(r_, had_clip ? &old_clip : nullptr);
+    render::clip_restore(r_, had_clip, old_clip);
 }
 
 void MenuRenderer::draw(int page, const SceneOptions& so, const RenderOptions& ro, const SDL_FRect& dst) {
@@ -164,12 +165,12 @@ void MenuRenderer::draw(int page, const SceneOptions& so, const RenderOptions& r
     bool had_clip = SDL_RenderClipEnabled(r_);
     SDL_GetRenderClipRect(r_, &old_clip);
     SDL_Rect clip{int(dst.x), int(dst.y), int(dst.w + 0.5f), int(dst.h + 0.5f)};
-    SDL_SetRenderClipRect(r_, &clip);
+    render::clip_set(r_, clip);
     SDL_SetRenderDrawBlendMode(r_, SDL_BLENDMODE_BLEND);
     drawing_ = scene_;
     for (const DrawItem& it : scene_->draw_list(page, so)) draw_element(*it.element, it.widget, ro, dst);
     drawing_ = nullptr;
-    SDL_SetRenderClipRect(r_, had_clip ? &old_clip : nullptr);
+    render::clip_restore(r_, had_clip, old_clip);
 }
 
 void MenuRenderer::draw_element(const Element& e, bool widget, const RenderOptions& ro, const SDL_FRect& dst) {
@@ -249,7 +250,7 @@ void MenuRenderer::draw_element(const Element& e, const std::vector<SDL_Texture*
             SDL_Rect c{int(left), int(top), int(right - left + 0.5f), int(bottom - top + 0.5f)};
             SDL_Rect both = c;
             if (had) SDL_GetRectIntersection(&c, &old_clip, &both);
-            SDL_SetRenderClipRect(r_, &both);
+            render::clip_set(r_, both);
             clipped = true;
             if (!had) old_clip = {0, 0, 0, 0};
         }
@@ -260,7 +261,7 @@ void MenuRenderer::draw_element(const Element& e, const std::vector<SDL_Texture*
         if (t.has_text_color) tc = {t.text_color.r, t.text_color.g, t.text_color.b, tc.a};
         req.color = modulate(tc);
         text_(r_, req);
-        if (clipped) SDL_SetRenderClipRect(r_, old_clip.w ? &old_clip : nullptr);
+        if (clipped) render::clip_restore(r_, old_clip.w > 0, old_clip);
     }
     if (ro.outlines || (widget && ro.widget_labels)) {
         SDL_FRect box{left, top, right - left, bottom - top};

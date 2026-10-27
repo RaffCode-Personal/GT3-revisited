@@ -4,6 +4,7 @@
 // (Race screen code map: docs/dev/RACE.md.)
 
 #include "app/screen_race_impl.h"
+#include "render/clip.h"
 
 namespace gt3r::race_screen {
 
@@ -761,11 +762,11 @@ void RaceScreen::render_drive(App& app, Ui& ui) {
             SDL_FRect dst = menu_dst;
             dst.y = hf.y; // the full-screen panel from the top of the half
             SDL_Rect clip{int(hf.x), int(hf.y), int(hf.w), int(hf.h)};
-            SDL_SetRenderClipRect(ui.renderer(), &clip);
+            render::clip_set(ui.renderer(), clip);
             std::vector<SDL_FRect> icons;
             results_.draw(ui.renderer(), hud_.fonts(), rows, finish_wait_, dst, &icons);
             for (size_t i = 0; i < rows.size() && i < icons.size(); ++i) draw_car_icon(app, rows[i].car, icons[i], i);
-            SDL_SetRenderClipRect(ui.renderer(), nullptr);
+            render::clip_off(ui.renderer());
         }
     } else if (finished_ && !replaying_) {
         if (field_) {

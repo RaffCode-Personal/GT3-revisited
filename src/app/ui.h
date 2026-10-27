@@ -72,7 +72,7 @@ public:
     // Finger-sized targets (phones and tablets).
     bool touch() const { return touch_; }
 
-    void clear();
+    void clear(bool game_frame = false);
     void text(float x, float y, std::string_view s, Color c = colors::kText);
     void text_right(float right, float y, std::string_view s, Color c = colors::kText);
     void text_center(float y, std::string_view s, Color c = colors::kText);       // centred in width()

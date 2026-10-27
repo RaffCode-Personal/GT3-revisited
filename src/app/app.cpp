@@ -11,6 +11,7 @@
 #include "platform/render_scale.h"
 #include "platform/mac_layer.h"
 #include "platform/shared_storage.h"
+#include "render/clip.h"
 
 #include <algorithm>
 #include <cmath>
@@ -536,15 +537,15 @@ SDL_AppResult App::iterate() {
 #if GT3R_XR
     if (xr_) SDL_SetRenderTarget(renderer_, xr_->canvas()); // the frame goes into the canvas
 #endif
-    layout_ui(!screens_.empty() && screens_.back()->adaptive_ui(), !screens_.empty() && screens_.back()->game_frame());
-    ui_->clear();
+    const bool game_frame = !screens_.empty() && screens_.back()->game_frame();
+    layout_ui(!screens_.empty() && screens_.back()->adaptive_ui(), game_frame);
+    ui_->clear(game_frame);
+    render::clip_off(renderer_); // in 4:3, the box (render/clip.h); also drops a clip left from the last frame
     Uint64 h_r0 = SDL_GetTicksNS();
     if (!screens_.empty()) screens_.back()->render(*this, *ui_);
     updates().dialog_render(*ui_);
-    if (four_three_) { // what the 16:9 layout draws past the 4:3 box would show in side bars
-        ui_->fill(0, 0, Ui::kFrame43X, Ui::kHeight, Color{0, 0, 0});
-        ui_->fill(Ui::kWidth - Ui::kFrame43X, 0, Ui::kFrame43X, Ui::kHeight, Color{0, 0, 0});
-    }
+    // (The touch controls and the phone mask draw without the 4:3 viewport, where this is safe.)
+    SDL_SetRenderClipRect(renderer_, nullptr);
     Uint64 h_r1 = SDL_GetTicksNS();
     touch_.set_safe_area(safe_area_window());
     touch_.render(*ui_);
