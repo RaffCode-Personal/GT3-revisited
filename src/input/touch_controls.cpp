@@ -185,9 +185,9 @@ void TouchControls::build_layout() {
     }
 }
 
-void TouchControls::set_screen(float x0, float y0, float x1, float y1) {
+void TouchControls::set_screen(float x0, float y0, float x1, float y1, float area_x0, float area_x1) {
     // Never smaller than the game area; ignore sub-unit jitter.
-    x0 = std::min(x0, 0.0f), y0 = std::min(y0, 0.0f), x1 = std::max(x1, kW), y1 = std::max(y1, kH);
+    x0 = std::min(x0, area_x0), y0 = std::min(y0, 0.0f), x1 = std::max(x1, area_x1), y1 = std::max(y1, kH);
     if (std::fabs(x0 - screen_x0_) < 0.5f && std::fabs(y0 - screen_y0_) < 0.5f && std::fabs(x1 - screen_x1_) < 0.5f &&
         std::fabs(y1 - screen_y1_) < 0.5f)
         return;

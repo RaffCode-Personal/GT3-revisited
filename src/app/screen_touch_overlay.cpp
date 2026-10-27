@@ -304,7 +304,11 @@ void TouchOverlay::render(Ui& ui) {
         if (SDL_Window* win = SDL_GetRenderWindow(r); win && SDL_GetWindowSize(win, &ww, &wh) &&
             SDL_RenderCoordinatesFromWindow(r, 0, 0, &x0, &y0) &&
             SDL_RenderCoordinatesFromWindow(r, float(ww), float(wh), &x1, &y1)) {
-            controls_.set_screen(x0, y0, x1, y1);
+            // With the 4:3 aspect the viewport starts left of the logical area (App::layout_ui):
+            // the window shows -vp.x .. -vp.x + lw of the 640 units.
+            SDL_Rect vp{};
+            const float ax0 = SDL_RenderViewportSet(r) && SDL_GetRenderViewport(r, &vp) ? -float(vp.x) : 0.0f;
+            controls_.set_screen(x0, y0, x1, y1, ax0, ax0 > 0 ? ax0 + float(lw) : float(Ui::kWidth));
             // Display cutout / rounded corners, as insets from the window edges.
             float sx0 = x0, sy0 = y0, sx1 = x1, sy1 = y1;
             const SDL_FRect& sa = safe_window_;

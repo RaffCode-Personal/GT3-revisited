@@ -77,7 +77,9 @@ public:
     // The whole window in UI units; extends past 0..kWidth / 0..kHeight where
     // the game area is letterboxed. Controls anchor to its edges, so they sit
     // in the side bars of wide phones. Default: the game area itself.
-    void set_screen(float x0, float y0, float x1, float y1);
+    // `area_x0` .. `area_x1`: the part of 0..kWidth the window shows across (all of it, or the
+    // 4:3 box with the 4:3 aspect, App::four_three); the screen is never narrower.
+    void set_screen(float x0, float y0, float x1, float y1, float area_x0 = 0, float area_x1 = 640);
     // Parts of the screen edges (UI units) that controls must stay clear of:
     // display cutouts and rounded corners. Controls keep at least their
     // normal margin from the screen edge, or this inset plus a little.
