@@ -314,11 +314,18 @@ void TouchOverlay::render(Ui& ui) {
         }
     }
     if (!controls_.visible()) return;
+    // The 4:3 aspect's viewport (App::layout_ui) starts left of the logical area and is no
+    // taller than it: drop it, so controls reach the whole window, and add its offset.
+    SDL_Rect vp{};
+    const bool had_vp = SDL_RenderViewportSet(r) && SDL_GetRenderViewport(r, &vp);
+    if (had_vp) ox += float(vp.x), oy += float(vp.y);
     if (logical) {
         SDL_SetRenderLogicalPresentation(r, 0, 0, SDL_LOGICAL_PRESENTATION_DISABLED);
         SDL_SetRenderScale(r, k, k);
     }
+    SDL_SetRenderViewport(r, nullptr);
     draw_controls(ui, controls_, ox, oy);
+    SDL_SetRenderViewport(r, had_vp ? &vp : nullptr);
     if (logical) {
         SDL_SetRenderScale(r, 1, 1);
         SDL_SetRenderLogicalPresentation(r, lw, lh, mode);
