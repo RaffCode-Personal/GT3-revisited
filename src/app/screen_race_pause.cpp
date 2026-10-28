@@ -134,8 +134,7 @@ void RaceScreen::online_pause_note(Ui& ui) {
 
 void RaceScreen::render_pause(Ui& ui) {
     if (replay_opts_open_) {
-        float mh = float(Ui::kHeight), mw = mh * 4.0f / 3.0f;
-        SDL_FRect dst = frame43_ ? frame_rect_ : SDL_FRect{(float(Ui::kWidth) - mw) / 2, 0, mw, mh};
+        SDL_FRect dst = menu_rect();
         Color dim{0, 0, 0, 126}; // panel_bg1 reaches past the 4:3 frame (860 wide)
         if (dst.x > 0) ui.fill(0, 0, dst.x, float(Ui::kHeight), dim);
         if (dst.x + dst.w < float(Ui::kWidth)) ui.fill(dst.x + dst.w, 0, float(Ui::kWidth) - dst.x - dst.w, float(Ui::kHeight), dim);
@@ -144,8 +143,7 @@ void RaceScreen::render_pause(Ui& ui) {
     }
     if (!pause_more_) {
         if (pause_menu_.loaded(pause_menu_.kind())) {
-            float mh = float(Ui::kHeight), mw = mh * 4.0f / 3.0f;
-            SDL_FRect dst = frame43_ ? frame_rect_ : SDL_FRect{(float(Ui::kWidth) - mw) / 2, 0, mw, mh};
+            SDL_FRect dst = menu_rect();
             // The window's full-screen dim (pmb "bg1") also covers the picture outside the
             // 4:3 frame on wide screens.
             Color dim{0, 0, 0, 126};

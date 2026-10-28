@@ -136,6 +136,7 @@ TEST(race_layout_presets) {
     CHECK(targets_of(modern, "pad.east") == V{"Circle"});
     CHECK(targets_of(modern, "pad.north") == V{"R1"});
     CHECK(targets_of(modern, "pad.rightstick") == V{"L1"});
+    CHECK(targets_of(modern, "pad.righty+") == V{"L1"}); // look back also on the right stick pulled back
     CHECK(targets_of(modern, "pad.leftshoulder") == V{"Triangle"});
     // Respawn (Select) is keyboard only: no controller button restarts the car by accident.
     CHECK(targets_of(modern, "pad.back").empty());

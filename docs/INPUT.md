@@ -157,7 +157,7 @@ The race pad's buttons keep GT3's meaning, and the race layout (per player:
 | Shift up / down (R2 / L2) | Cross / Square (A / X), back paddles | R2 / L2 | E / Q |
 | Reverse (Triangle, pressure) | L1 (held) | Triangle | R |
 | Change view (R1) | Triangle / Y | R1 | C |
-| Look back, held (L1) | R3 | L1 | X |
+| Look back, held (L1) | R3 or right stick back | L1 | X |
 | Respawn (Select, ours) | unbound (keyboard / touch only) | unbound | Backspace |
 | Pause (Start) | Start | Start | Esc, P |
 | Performance overlay (R3, ours; developer tool) | unbound | unbound | unbound |

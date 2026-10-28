@@ -342,11 +342,28 @@ void App::set_dynamic_resolution(bool on) {
 
 std::string App::aspect() const {
     std::string v = to_lower(config_.get("video", "aspect").value_or("auto"));
-    return v == "16:9" || v == "4:3" ? v : "auto";
+    return v == "16:9" || v == "4:3" || v == "6:5" ? v : "auto";
 }
 
 void App::set_aspect(const std::string& v) {
     config_.set("video", "aspect", v);
+    save_config();
+}
+
+bool App::picture_top() const { return config_.get("video", "picture_top").value_or("0") == "1"; }
+
+void App::set_picture_top(bool on) {
+    config_.set("video", "picture_top", on ? "1" : "0");
+    save_config();
+}
+
+int App::hud_scale() const {
+    const int v = std::atoi(config_.get("video", "hud_scale").value_or("100").c_str());
+    return v > 0 ? std::clamp(v, 25, 200) : 100;
+}
+
+void App::set_hud_scale(int percent) {
+    config_.set("video", "hud_scale", std::to_string(std::clamp(percent, 25, 200)));
     save_config();
 }
 
@@ -538,7 +555,8 @@ SDL_AppResult App::iterate() {
     if (xr_) SDL_SetRenderTarget(renderer_, xr_->canvas()); // the frame goes into the canvas
 #endif
     const bool game_frame = !screens_.empty() && screens_.back()->game_frame();
-    layout_ui(!screens_.empty() && screens_.back()->adaptive_ui(), game_frame);
+    layout_ui(!screens_.empty() && screens_.back()->adaptive_ui(), game_frame,
+              !screens_.empty() && screens_.back()->fills_frame());
     ui_->clear(game_frame);
     render::clip_off(renderer_); // in 4:3, the box (render/clip.h); also drops a clip left from the last frame
     Uint64 h_r0 = SDL_GetTicksNS();
@@ -698,7 +716,7 @@ SDL_FRect App::safe_area_window() const {
     return r;
 }
 
-void App::layout_ui(bool adaptive, bool game_frame) {
+void App::layout_ui(bool adaptive, bool game_frame, bool fills_frame) {
     int pw = 0, ph = 0, ww = 0, wh = 0;
     SDL_GetRenderOutputSize(renderer_, &pw, &ph);
     SDL_GetWindowSize(window_, &ww, &wh);
@@ -713,27 +731,40 @@ void App::layout_ui(bool adaptive, bool game_frame) {
     SDL_RendererLogicalPresentation cur_mode = SDL_LOGICAL_PRESENTATION_DISABLED;
     SDL_GetRenderLogicalPresentation(renderer_, &cur_w, &cur_h, &cur_mode);
     four_three_ = false;
+    box_w_ = Ui::kWidth;
     if (!adaptive || pw < 160 || ph < 90 || ww <= 0 || wh <= 0) {
-        // [video] aspect: the 4:3 box of the 640x360 space. The logical size is (about) the box
-        // and the viewport starts left of it, so screens keep drawing (and SDL keeps mapping
-        // input) in 640x360 units.
+        // [video] aspect: the 4:3 (or 6:5) box of the 640x360 space. The logical size is
+        // (about) the box and the viewport starts left of it, so screens keep drawing (and SDL
+        // keeps mapping input) in 640x360 units.
+        bool six_five = false;
         if (game_frame && !adaptive && pw > 0 && ph > 0) {
             const std::string a = aspect();
-            four_three_ = a == "4:3" || (a == "auto" && pw * 2 < ph * 3);
+            four_three_ = a == "4:3" || a == "6:5" || (a == "auto" && pw * 2 < ph * 3);
+            six_five = a == "6:5" && fills_frame;
         }
 #if GT3R_XR
-        if (xr_) four_three_ = false; // the virtual screen is 16:9
+        if (xr_) four_three_ = six_five = false; // the virtual screen is 16:9
 #endif
+        if (four_three_) box_w_ = six_five ? Ui::kHeight * 6 / 5 : Ui::kFrame43W;
+        const int box_x = (Ui::kWidth - box_w_) / 2;
         // SDL rounds the viewport's pixel offset (-x0 x scale) and a clip rectangle's pixel
         // position (x x scale) down separately, so a clip at x = x0 would become a scissor at
         // x = -1, which Vulkan does not allow (phones dropped those draws). The window therefore
         // starts 1 unit left of the box (and ends 1 unit right of it, black), so clips at the
         // box's edge stay a few pixels inside.
-        const int lw = four_three_ ? Ui::kFrame43W + 2 : Ui::kWidth;
-        if (cur_w != lw || cur_h != Ui::kHeight || cur_mode != SDL_LOGICAL_PRESENTATION_LETTERBOX)
-            SDL_SetRenderLogicalPresentation(renderer_, lw, Ui::kHeight, SDL_LOGICAL_PRESENTATION_LETTERBOX);
-        const SDL_Rect box{-(Ui::kFrame43X - 1), 0, Ui::kWidth, Ui::kHeight};
-        SDL_SetRenderViewport(renderer_, four_three_ ? &box : nullptr);
+        const int lw = four_three_ ? box_w_ + 2 : Ui::kWidth;
+        // [video] picture_top: a window taller than the picture gets a logical area of the
+        // window's shape with the picture at its top, so both bars go below it.
+        int lh = Ui::kHeight;
+        if (picture_top() && pw > 0 && double(ph) * lw > double(pw) * Ui::kHeight)
+            lh = int(double(lw) * ph / pw);
+#if GT3R_XR
+        if (xr_) lh = Ui::kHeight;
+#endif
+        if (cur_w != lw || cur_h != lh || cur_mode != SDL_LOGICAL_PRESENTATION_LETTERBOX)
+            SDL_SetRenderLogicalPresentation(renderer_, lw, lh, SDL_LOGICAL_PRESENTATION_LETTERBOX);
+        const SDL_Rect box{four_three_ ? -(box_x - 1) : 0, 0, Ui::kWidth, Ui::kHeight};
+        SDL_SetRenderViewport(renderer_, four_three_ || lh != Ui::kHeight ? &box : nullptr);
         if (ui_) ui_->set_layout(Ui::kWidth, Ui::kHeight, {0, 0, Ui::kWidth, Ui::kHeight}, touch_ui_);
         return;
     }

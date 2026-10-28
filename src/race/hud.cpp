@@ -32,13 +32,29 @@ SDL_FRect g_vp{0, 0, 640, 360};
 // Per-block transform (touch-control safe area): the block is scaled by g_s about the
 // pivot (UI units, before the shift) and shifted by (g_dx, g_dy). Identity normally.
 float g_dx = 0, g_dy = 0, g_s = 1, g_px = 0, g_py = 0;
-// 4:3 frame (original resolution option): the 640x448 layout as is, no 16:9 widening.
+// 4:3 frame (original resolution option, the 4:3 aspect): the 640x448 layout as is, no 16:9
+// widening. A narrower frame (the 6:5 aspect) keeps the units' shape: the layout is g_vw units
+// wide (480 per 360 of height) and the edge items come in by the (negative) margin.
 bool g_43 = false;
-float margin() { return g_43 ? 0.0f : kMargin; }
-float vsx() { return (g_43 ? 1.0f : kSx) * g_vp.w / 640.0f * g_s; }
+float g_vw = 640;
+// The race HUD size option (HudData::scale): each block scales about its corner of the frame.
+float g_user = 1;
+float margin() { return g_43 ? (g_vw - 640.0f) / 2 : kMargin; }
+float vsx() { return (g_43 ? 640.0f / g_vw : kSx) * g_vp.w / 640.0f * g_s; }
 float vsy() { return kSy * g_vp.h / 360.0f * g_s; }
 float ux(float x) { return g_vp.x + (x + margin()) * vsx() + (1 - g_s) * (g_px - g_vp.x) + g_dx; }
 float uy(float y) { return g_vp.y + y * vsy() + (1 - g_s) * (g_py - g_vp.y) + g_dy; }
+
+void set_frame(const SDL_FRect* viewport, bool four_three) {
+    g_vp = viewport ? *viewport : SDL_FRect{0, 0, 640, 360};
+    g_43 = four_three;
+    g_vw = g_vp.h > 0 ? 480.0f * g_vp.w / g_vp.h : 640.0f;
+}
+
+// The user scale about a point of the frame (fx, fy: 0 left / top .. 1 right / bottom).
+void user_scale(float fx, float fy) {
+    g_s = g_user, g_px = g_vp.x + g_vp.w * fx, g_py = g_vp.y + g_vp.h * fy;
+}
 
 // Game alignment: 0 left/top, 1 right/bottom, 2 centre; +4 = pushed outward in 16:9.
 float anchor(float pos, float size, int align) {
@@ -351,8 +367,7 @@ void Hud::draw_meter(SDL_Renderer* r, const Meter& m, float value) {
 }
 
 void Hud::draw_replay_mark(SDL_Renderer* r, float alpha, const SDL_FRect* viewport, bool four_three) {
-    g_vp = viewport ? *viewport : SDL_FRect{0, 0, 640, 360};
-    g_43 = four_three;
+    set_frame(viewport, four_three);
     g_dx = g_dy = 0, g_s = 1;
     if (alpha <= 0) return;
     if (const Image* im = image("gt_logo_mini")) {
@@ -365,9 +380,10 @@ void Hud::draw_replay_mark(SDL_Renderer* r, float alpha, const SDL_FRect* viewpo
 }
 
 void Hud::draw_title(SDL_Renderer*, const HudData& d, const SDL_FRect* viewport) {
-    g_vp = viewport ? *viewport : SDL_FRect{0, 0, 640, 360};
-    g_43 = d.four_three;
-    g_dx = g_dy = 0, g_s = 1;
+    set_frame(viewport, d.four_three);
+    g_user = d.scale;
+    g_dx = g_dy = 0;
+    user_scale(0.5f, 0.5f);
     // The title (presentation §B3): the course name in capitals, sw_20 at 160 % in light grey,
     // squeezed to the row's width; FINISH at the same place.
     const HudRow* title = hud_row(d.mode, HudPart::Title, 0, d.onboard ? 0 : 1);
@@ -386,8 +402,7 @@ void Hud::draw_title(SDL_Renderer*, const HudData& d, const SDL_FRect* viewport)
 }
 
 void Hud::draw_pause(SDL_Renderer* r, int selected, const SDL_FRect* viewport, bool four_three) {
-    g_vp = viewport ? *viewport : SDL_FRect{0, 0, 640, 360};
-    g_43 = four_three;
+    set_frame(viewport, four_three);
     g_dx = g_dy = 0, g_s = 1;
     // Measured on the captures: two buttons 204..318 and 324..436 x 199..224 (frame units),
     // the selected one light orange (253, 168, 112), the other orange (253, 101, 0), dark labels.
@@ -402,8 +417,7 @@ void Hud::draw_pause(SDL_Renderer* r, int selected, const SDL_FRect* viewport, b
 }
 
 void Hud::draw_replay_pause(SDL_Renderer* r, int selected, const SDL_FRect* viewport, bool four_three) {
-    g_vp = viewport ? *viewport : SDL_FRect{0, 0, 640, 360};
-    g_43 = four_three;
+    set_frame(viewport, four_three);
     g_dx = g_dy = 0, g_s = 1;
     // Measured on the captures: the frame dimmed, a dark strip 96..536 x 183..240, buttons
     // 124..236 / 244..356 / 364..508 x 192..216 (selected light orange).
@@ -711,8 +725,8 @@ void Hud::draw_rank(SDL_Renderer* r, const HudData& d, int view) {
 }
 
 void Hud::draw(SDL_Renderer* r, const HudData& d, const SDL_FRect* viewport) {
-    g_vp = viewport ? *viewport : SDL_FRect{0, 0, 640, 360};
-    g_43 = d.four_three;
+    set_frame(viewport, d.four_three);
+    g_user = d.scale;
     ++blink_;
     pole_icon_rect_ = {0, 0, 0, 0};
     // Touch controls: the meters move inside the uncovered area, the top blocks only where a
@@ -723,7 +737,8 @@ void Hud::draw(SDL_Renderer* r, const HudData& d, const SDL_FRect* viewport) {
     // Meter cluster: bottom right of the safe area, smaller when the controls leave a
     // narrow area (16:9 / 16:10 with the right-hand cluster on screen).
     g_dx = right, g_dy = bottom;
-    g_s = std::clamp(sa.w / 560.0f, 0.7f, 1.0f), g_px = 640, g_py = 360;
+    user_scale(1, 1);
+    g_s *= std::clamp(sa.w / 560.0f, 0.7f, 1.0f);
     // d.layer: 0 everything, 1 all but the lap / time block, 2 only that block (the results
     // panel goes between them: the original draws the times over it, the rest under it).
     const bool body = d.layer != 2, times = d.layer != 1 && (d.items & kItemTimes);
@@ -755,7 +770,8 @@ void Hud::draw(SDL_Renderer* r, const HudData& d, const SDL_FRect* viewport) {
         // --- laps and times (right) --------------------------------------------------------
         // In the corner. Where a touch control would cover it, moved left just clear of the
         // controls, or inside the safe area when that is further than the area's right edge.
-        g_dx = 0, g_dy = 0, g_s = 1;
+        g_dx = 0, g_dy = 0;
+        user_scale(1, 0);
         if (!d.touch_controls.empty()) {
             const float s = clear_sideways(measure([&] { draw_times(r, d, view); }), d.touch_controls, -1);
             if (s <= -right) g_dx = -s;
@@ -768,7 +784,7 @@ void Hud::draw(SDL_Renderer* r, const HudData& d, const SDL_FRect* viewport) {
     // Each in its corner; the same rule as the times, mirrored (moved right). The rank's
     // fallback takes the map along (it would come down onto it).
     float rank_dx = 0, rank_dy = 0, map_dx = 0, map_dy = 0;
-    g_s = 1;
+    user_scale(0, 0);
     if (!d.touch_controls.empty()) {
         g_dx = 0, g_dy = 0;
         const float rs = clear_sideways(measure([&] { draw_rank(r, d, view); }), d.touch_controls, 1);
@@ -787,8 +803,8 @@ void Hud::draw(SDL_Renderer* r, const HudData& d, const SDL_FRect* viewport) {
     draw_rank(r, d, view);
 
     // --- start countdown, title, wrong way --------------------------------------------------
-    g_dx = 0, g_dy = 0, g_s = 1;
-    draw_title(r, d, viewport);
+    g_dx = 0, g_dy = 0;
+    draw_title(r, d, viewport); // (the user scale about the frame's centre)
     const HudRow* title = row(HudPart::Title, 0);
     if (d.countdown >= 0) {
         if (d.countdown > 0) {
@@ -858,6 +874,7 @@ void Hud::draw(SDL_Renderer* r, const HudData& d, const SDL_FRect* viewport) {
     const HudRow* tyres = row(HudPart::Tires);
     if (tyres && (d.items & kItemTires) && d.show_tires && tire_outline_.tex) {
         g_dx = 0, g_dy = std::min(0.0f, d.safe_area.y + d.safe_area.h - 360.0f);
+        user_scale(0, 1);
         float x = anchor(tyres->x, 0, tyres->align), y = tyres->y - tire_outline_.h;
         SDL_FRect rc{ux(x), uy(y), tire_outline_.w * vsx(), tire_outline_.h * vsy()};
         for (int i = 0; i < 4; ++i) {
@@ -868,6 +885,7 @@ void Hud::draw(SDL_Renderer* r, const HudData& d, const SDL_FRect* viewport) {
         SDL_SetTextureColorMod(tire_outline_.tex, 32, 32, 32);
         SDL_RenderTexture(r, tire_outline_.tex, nullptr, &rc);
         g_dx = 0, g_dy = 0;
+        user_scale(0.5f, 0.5f);
     }
     // Replay items (presentation §D9): the car's name, light grey sw_16 on its row (squeezed to
     // the row's width); the steering and accel / brake monitors.
@@ -941,6 +959,7 @@ constexpr SplitLayout kSplit169{426.667f, 448, 16, 60, 310 + kMargin, 60, 413, {
 
 void Hud::draw_split(SDL_Renderer* r, const HudData& d, const SDL_FRect& half, bool horizontal) {
     g_43 = false;
+    g_user = 1;
     g_dx = g_dy = 0, g_s = 1;
     pole_icon_rect_ = {0, 0, 0, 0};
     const SplitLayout& L = horizontal ? kSplit43 : kSplit169;

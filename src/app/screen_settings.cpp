@@ -438,15 +438,29 @@ private:
         else
             info("Fullscreen", "Always on this device");
 
-        static const char* const kAspects[] = {"auto", "16:9", "4:3"};
+        static const char* const kAspects[] = {"auto", "16:9", "4:3", "6:5"};
         const std::string aspect = app.aspect();
         int aidx = 0;
-        for (int i = 0; i < 3; ++i)
+        for (int i = 0; i < 4; ++i)
             if (aspect == kAspects[i]) aidx = i;
         choice("Aspect ratio",
                "Shape of the game's picture. 4:3 fills tablets and unfolded foldables, like the original; "
+               "6:5: races fill an unfolded Galaxy Fold, the game's menus stay 4:3. "
                "Auto: 4:3 on screens narrower than 3:2, otherwise 16:9.",
-               {"Auto", "16:9", "4:3"}, aidx, [a](int i) { a->set_aspect(kAspects[i]); });
+               {"Auto", "16:9", "4:3", "6:5"}, aidx, [a](int i) { a->set_aspect(kAspects[i]); });
+        toggle("Picture at the top",
+               "When the screen is taller than the picture, show it at the top edge with both black bars "
+               "below it instead of one above and one below.",
+               app.picture_top(), [a](bool v) { a->set_picture_top(v); });
+
+        std::vector<std::string> hud_names;
+        std::vector<int> hud_values;
+        for (int v = 25; v <= 200; v = v < 30 ? 30 : v + 10) hud_values.push_back(v), hud_names.push_back(std::to_string(v) + "%");
+        int hidx = 0;
+        for (int i = 0; i < int(hud_values.size()); ++i)
+            if (std::abs(hud_values[size_t(i)] - app.hud_scale()) < std::abs(hud_values[size_t(hidx)] - app.hud_scale())) hidx = i;
+        choice("Race HUD size", "Size of the speedometer, lap times, map and the other race displays.", hud_names, hidx,
+               [a, hud_values](int i) { a->set_hud_scale(hud_values[size_t(i)]); });
 
         bool vsync = cfg.get("video", "vsync").value_or("1") != "0";
         toggle("VSync", "Wait for the display refresh: no tearing. Off: lower input latency.", vsync, [a](bool v) {

@@ -112,6 +112,7 @@ struct HudData {
     std::array<int, 4> tire_levels{};
     int layer = 0;            // 0 all, 1 all but the lap / time block, 2 that block only
     bool four_three = false;  // drawn into a 4:3 viewport (original resolution): no 16:9 widening
+    float scale = 1;          // the HUD size option ([video] hud_scale): blocks scale about their corners
     bool auto_drive = false;  // "AUTO DRIVE" (the computer drives: pit lane, flying start run-up)
     // Odometer cluster: the car's total distance (km or miles, by `imperial`) and this race's
     // trip distance (m); indicator lamps: 0 off, 1 on, 2 acting (blinks).

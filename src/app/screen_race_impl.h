@@ -208,6 +208,7 @@ public:
     // Phones: driving touch controls while racing, menu controls otherwise.
     TouchLayout touch_layout() const override;
     bool game_frame() const override { return true; }
+    bool fills_frame() const override { return true; }
     void render(App& app, Ui& ui) override;
 
 private:
@@ -667,6 +668,14 @@ private:
     // The 3D view and HUD in the 4:3 frame: original_res_, or the 4:3 aspect (App::four_three) at
     // full resolution. Set each frame by render_drive.
     bool frame43_ = false;
+    SDL_FRect box_{0, 0, 640, 360}; // App::game_box() this frame
+    float hud_scale_ = 1;            // App::hud_scale() (HudData::scale)
+    // The game's 4:3 menus and overlays (640x448 layouts): the 4:3 box, fitted into a narrower
+    // game box (6:5: centred, bars above and below).
+    SDL_FRect menu_rect() const {
+        const float w = std::min(box_.w, box_.h * 4.0f / 3.0f), h = w * 0.75f;
+        return {box_.x + (box_.w - w) / 2, box_.y + (box_.h - h) / 2, w, h};
+    }
     double script_time_ = 0;
     double leave_clock_ = 0; // preset leave: seconds since the finish
     std::optional<BestLicense> best_license_; // the best finished licence run of this visit

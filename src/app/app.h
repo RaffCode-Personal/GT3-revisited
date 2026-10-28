@@ -42,6 +42,9 @@ public:
     // the 640x360 space. With the 4:3 aspect (App::four_three) the window shows only that 4:3
     // box (Ui::kFrame43X .. + kFrame43W); other screens keep the 16:9 space.
     virtual bool game_frame() const { return false; }
+    // Game-frame screens whose picture can fill a 6:5 box too (the race: its 3D view and HUD
+    // follow the box). Others keep the 4:3 box under the 6:5 aspect.
+    virtual bool fills_frame() const { return false; }
     // The startup update dialog (app/updates.h) may open over this screen: the main menu, the
     // first-run screen and the game's title menu.
     virtual bool update_prompts() const { return false; }
@@ -93,14 +96,24 @@ public:
     void remember_race_scale();
     // Applies [video] render_scale (after the setting changed).
     void apply_render_scale();
-    // [video] aspect = auto | 16:9 | 4:3: the shape of the game area for Screen::game_frame()
-    // screens. 16:9: the 640x360 space letterboxed to the window (as before). 4:3: only its
-    // middle 4:3 box, so 4:3-ish screens (tablets, unfolded foldables) are filled at their
-    // full resolution. auto: 4:3 on windows narrower than 3:2, otherwise 16:9.
+    // [video] aspect = auto | 16:9 | 4:3 | 6:5: the shape of the game area for
+    // Screen::game_frame() screens. 16:9: the 640x360 space letterboxed to the window (as
+    // before). 4:3: only its middle 4:3 box, so 4:3-ish screens (tablets, unfolded foldables)
+    // are filled at their full resolution. 6:5: a 432x360 box for Screen::fills_frame()
+    // screens (the race), the 4:3 box for the others. auto: 4:3 on windows narrower than 3:2,
+    // otherwise 16:9.
     std::string aspect() const;
     void set_aspect(const std::string& v);
-    // This frame shows the 4:3 box (set by layout_ui).
+    // This frame shows a box narrower than 16:9 (4:3 or 6:5; set by layout_ui).
     bool four_three() const { return four_three_; }
+    // The game area this frame shows, in UI units: the whole 640x360 space, or the middle box.
+    SDL_FRect game_box() const { return {float(Ui::kWidth - box_w_) / 2, 0, float(box_w_), float(Ui::kHeight)}; }
+    // [video] picture_top: with bars above and below the picture, both go below it.
+    bool picture_top() const;
+    void set_picture_top(bool on);
+    // [video] hud_scale: the race HUD's size in percent (25..200, default 100).
+    int hud_scale() const;
+    void set_hud_scale(int percent);
 
     void push(std::unique_ptr<Screen> s) { pending_.push_back(std::move(s)); }
     void pop() { ++pops_; }
@@ -138,7 +151,7 @@ private:
     void save_screenshot(const std::string& path);
     void push_game_start(); // boot screen: opening movie, then the title menu
     // Sets the renderer's logical presentation and the Ui layout for the frame.
-    void layout_ui(bool adaptive, bool game_frame);
+    void layout_ui(bool adaptive, bool game_frame, bool fills_frame = false);
     // Window area (window coordinates) clear of display cutouts and, on
     // phones, the rounded screen corners.
     SDL_FRect safe_area_window() const;
@@ -193,6 +206,7 @@ private:
     double frame_limit_rate_ = 0;
     void apply_frame_limit();
     bool four_three_ = false; // this frame shows the 4:3 box ([video] aspect)
+    int box_w_ = Ui::kWidth;  // its width in UI units (game_box)
     bool touch_ui_ = false;  // phone/tablet sizing (mobile builds, or GT3R_PHONE)
     bool phone_sim_ = false; // GT3R_PHONE=1: desktop window shaped like a 20:9 phone
     std::optional<platform::DisplayInsets> display_insets_; // phones: cutout and corner radius (pixels)

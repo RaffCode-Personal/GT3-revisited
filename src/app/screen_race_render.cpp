@@ -307,6 +307,7 @@ HudRun RaceScreen::hud_run() const {
 HudData RaceScreen::hud_data(int player) {
     HudData d;
     d.imperial = imperial_;
+    d.scale = hud_scale_;
     bool p2 = player == 1;
     const sim::VehicleState& s = p2 ? render_state2_ : render_state_;
     const sim::VehicleSetup& su = p2 ? field_->second_setup() : vehicle_->setup();
@@ -569,10 +570,11 @@ render::DrawOptions RaceScreen::draw_options() const {
 
 void RaceScreen::render_drive(App& app, Ui& ui) {
     frame43_ = original_res_ || app.four_three();
+    box_ = app.game_box();
+    hud_scale_ = float(app.hud_scale()) / 100.0f;
     app.note_race_scale();
     upload_course_animations(); // once per frame
-    float mh = float(Ui::kHeight), mw = mh * 4.0f / 3.0f;
-    SDL_FRect menu_dst{(float(Ui::kWidth) - mw) / 2, 0, mw, mh};
+    const SDL_FRect menu_dst = menu_rect();
     if (quick_) {
         ui.fill(0, 0, float(Ui::kWidth), float(Ui::kHeight), Color{0, 0, 0, 255});
         bool licence_box = preview_ && !license_event_.empty();
@@ -610,9 +612,8 @@ void RaceScreen::render_drive(App& app, Ui& ui) {
     SDL_FRect rect2{0, 0, 0, 0}, half1{}, half2{};
     bool horizontal = split_horizontal(app);
     if (split) {
-        // With the 4:3 aspect (App::four_three) the halves share the 4:3 box.
-        const bool box = app.four_three();
-        float X = box ? float(Ui::kFrame43X) : 0.0f, W = box ? float(Ui::kFrame43W) : float(Ui::kWidth);
+        // With the 4:3 / 6:5 aspect (App::four_three) the halves share the box.
+        float X = box_.x, W = box_.w;
         float H = float(Ui::kHeight);
         if (horizontal) {
             half1 = rect = {X, 0, W, H / 2};
@@ -626,8 +627,9 @@ void RaceScreen::render_drive(App& app, Ui& ui) {
         ui.fill(0, 0, float(Ui::kWidth), H, Color{0, 0, 0, 255});
     }
     if (frame43_ && !split) {
-        // The original's 4:3 frame, pillarboxed; with original_res_ at its 640x448 internal size.
-        float H = float(Ui::kHeight), W = H * 4.0f / 3.0f;
+        // The original's 4:3 frame, pillarboxed (or the 6:5 box); with original_res_ at its
+        // 640x448 internal size.
+        float H = float(Ui::kHeight), W = app.four_three() ? box_.w : H * 4.0f / 3.0f;
         ui.fill(0, 0, float(Ui::kWidth), H, Color{0, 0, 0, 255});
         rect = {(float(Ui::kWidth) - W) / 2, 0, W, H};
         if (original_res_) {
@@ -703,7 +705,7 @@ void RaceScreen::render_drive(App& app, Ui& ui) {
     log_perf(false);
 
     if (logger_mode_) { // the Analyzer over the replay (or its graph over everything)
-        SDL_FRect dst = frame43_ ? frame_rect_ : SDL_FRect{(float(Ui::kWidth) - mw) / 2, 0, mw, mh};
+        SDL_FRect dst = menu_dst;
         if (analyzer_.view() == Analyzer::View::Graph) {
             ui.fill(0, 0, float(Ui::kWidth), float(Ui::kHeight), Color{0, 0, 0, 255});
         } else { // the bottom band (bg 0..212, indicator_back 0..148) across a wide screen too
