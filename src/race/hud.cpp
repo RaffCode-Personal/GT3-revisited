@@ -737,8 +737,11 @@ void Hud::draw(SDL_Renderer* r, const HudData& d, const SDL_FRect* viewport) {
     // Meter cluster: bottom right of the safe area, smaller when the controls leave a
     // narrow area (16:9 / 16:10 with the right-hand cluster on screen).
     g_dx = right, g_dy = bottom;
-    user_scale(1, 1);
-    g_s *= std::clamp(sa.w / 560.0f, 0.7f, 1.0f);
+    // The HUD size scales the in-car view's dials (bottom centre) about the bottom centre,
+    // unless the touch controls already shrink the cluster into its corner.
+    const float touch_s = std::clamp(sa.w / 560.0f, 0.7f, 1.0f);
+    user_scale(d.onboard && touch_s >= 1.0f ? 0.5f : 1.0f, 1);
+    g_s *= touch_s;
     // d.layer: 0 everything, 1 all but the lap / time block, 2 only that block (the results
     // panel goes between them: the original draws the times over it, the rest under it).
     const bool body = d.layer != 2, times = d.layer != 1 && (d.items & kItemTimes);
