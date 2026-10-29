@@ -29,6 +29,14 @@ struct TvCamera {
 };
 const char* camera_mode_name(CameraMode m);
 
+// Where the player view looks: ahead, or (held) back (GT3's L1), left or right (ours).
+enum class LookDir : u8 { Ahead, Back, Left, Right };
+// The right stick's look (ours): back, left or right once the stick is pushed past half way
+// clearly along that direction (its axis at least 1.5 times the other, so diagonals pick
+// none), then kept while the stick stays in that direction's quarter and off the centre.
+// rx, ry: -1..1, y down (back) positive. Forward is no look.
+LookDir stick_look(float rx, float ry, LookDir held);
+
 // GT3's pre-race shot (presentation §B3), by C = frames left to the start signal of a
 // standing-start hold: shown in every live view while C is 60 or more, at
 // t = 1 - (C - 60) / 600, with a 1 s dissolve from the last picture when C - 60 is 120 or 60
@@ -59,15 +67,19 @@ public:
     // the car model's frame (x right, y up, z back; origin at the wheelbase midpoint on the body's
     // lowest point). Defaults are GT3's fallbacks.
     void set_car_points(const render::Vec3& p0, const render::Vec3& p1) { point_[0] = p0, point_[1] = p1; }
-    // L1 held: look back (heading + pi, pitch negated); no mirror while held.
-    void set_look_back(bool on) { look_back_ = on; }
+    // L1 held: look back (heading + pi, pitch negated); no mirror while held. Left / right:
+    // heading +- pi/2, level (the in-car eye stays at the driver's place).
+    void set_look_back(bool on) { look_ = on ? LookDir::Back : LookDir::Ahead; }
+    void set_look(LookDir d) { look_ = d; }
+    LookDir look() const { return look_; }
     // GT3's pre-race shot (StartingCamera, cameras/start.cam): while `on`, the camera follows the
     // file's record 0 in the car's frame as t goes 0 -> 1 (eye, target and zoom curves).
     void set_intro(bool on, float t) { intro_ = on, intro_t_ = t; }
     // cameras/start.cam's record (without it: a straight move from 30 m ahead to the front corner).
     void set_start_shot(std::optional<GtrcRecord> r) { start_shot_ = std::move(r); }
     bool intro() const { return intro_; }
-    bool look_back() const { return look_back_; }
+    bool look_back() const { return look_ == LookDir::Back; }
+    bool looking_away() const { return look_ != LookDir::Ahead; }
 
     // Snap the smoothed chase state to the car (after reset/respawn).
     void snap(const sim::VehicleState& s);
@@ -122,7 +134,7 @@ private:
     float lag_yaw_ = 0, lag_yaw_w_ = 0, lag_yaw_acc_ = 0, lag_pitch_ = 0, lag_pitch_w_ = 0;
     double lag_time_ = 0;
     render::Vec3 point_[2] = {{0, -0.8f, 0}, {0, -1.5f, -6.0f}};
-    bool look_back_ = false;
+    LookDir look_ = LookDir::Ahead;
     bool mirror_ = true;
     // In-car vibration (GT3's OnBoardCamera shakers): random kicks scaled by the tyres' slip,
     // through a lag, stepped at 60 Hz; see update().

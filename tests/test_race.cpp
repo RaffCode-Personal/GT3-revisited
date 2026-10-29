@@ -1838,3 +1838,22 @@ TEST(race_course_scene_lights) {
     CHECK(std::fabs(il.specular[0][0] - 0.83f) < 1e-6f && std::fabs(il.diffuse[1][0] - 0.5f) < 1e-6f);
     CHECK(std::fabs(il.ambient[0] - 0.55f) < 1e-5f); // the enabled lights' ambients, global ambient 0
 }
+
+TEST(race_stick_look) {
+    using race::LookDir;
+    using race::stick_look;
+    const LookDir A = LookDir::Ahead;
+    CHECK(stick_look(0, 0, A) == A);
+    CHECK(stick_look(0, 0.9f, A) == LookDir::Back);
+    CHECK(stick_look(-0.9f, 0.1f, A) == LookDir::Left);
+    CHECK(stick_look(0.9f, -0.1f, A) == LookDir::Right);
+    CHECK(stick_look(0, -0.9f, A) == A);       // forward: no look
+    CHECK(stick_look(0.6f, 0.6f, A) == A);     // a diagonal picks none
+    CHECK(stick_look(0.4f, 0, A) == A);        // not past half way
+    // Held while the stick stays in that direction's quarter and off the centre.
+    CHECK(stick_look(0.6f, 0.5f, LookDir::Right) == LookDir::Right);
+    CHECK(stick_look(0.4f, 0, LookDir::Right) == LookDir::Right);
+    CHECK(stick_look(0.2f, 0, LookDir::Right) == A);
+    CHECK(stick_look(0.5f, 0.6f, LookDir::Right) == A); // into the back quarter, not clearly back
+    CHECK(stick_look(0.1f, 0.9f, LookDir::Right) == LookDir::Back);
+}

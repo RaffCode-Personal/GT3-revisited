@@ -668,6 +668,7 @@ private:
     // The 3D view and HUD in the 4:3 frame: original_res_, or the 4:3 aspect (App::four_three) at
     // full resolution. Set each frame by render_drive.
     bool frame43_ = false;
+    LookDir stick_look_ = LookDir::Ahead, stick_look2_ = LookDir::Ahead; // the right stick's look (players 1, 2)
     SDL_FRect box_{0, 0, 640, 360}; // App::game_box() this frame
     float hud_scale_ = 1;            // App::hud_scale() (HudData::scale)
     // The game's 4:3 menus and overlays (640x448 layouts): the 4:3 box, fitted into a narrower

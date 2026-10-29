@@ -689,7 +689,9 @@ void RaceScreen::update_drive(App& app, double dt) {
         camera_.set_look_back(false);
     } else {
         if (rpressed(PadButton::R1)) next_view(camera_, 0);
-        camera_.set_look_back(pad.down(PadButton::L1));
+        // L1 looks back; the right stick looks back, left or right (ours, race::stick_look).
+        stick_look_ = stick_look(pad.axis_f(PadAxis::RX), pad.axis_f(PadAxis::RY), stick_look_);
+        camera_.set_look(pad.down(PadButton::L1) ? LookDir::Back : stick_look_);
     }
     // Never online: a respawn there would skip track (respawn is offline only).
     if (!replaying_ && !online_ && own_race_pad && rpressed(PadButton::Select)) respawn();
@@ -750,7 +752,8 @@ void RaceScreen::update_drive(App& app, double dt) {
         PadState pad2 = app.input().race_pad(1);
         auto pressed2 = [&](PadButton b) { return pad2.down(b) && !(pad2_prev_ & (1u << unsigned(b))); };
         if (pressed2(PadButton::R1)) next_view(camera2_, 1);
-        camera2_.set_look_back(pad2.down(PadButton::L1));
+        stick_look2_ = stick_look(pad2.axis_f(PadAxis::RX), pad2.axis_f(PadAxis::RY), stick_look2_);
+        camera2_.set_look(pad2.down(PadButton::L1) ? LookDir::Back : stick_look2_);
         if (!replaying_ && !online_ && !app.input().race_uses_menu_pad(1) && pressed2(PadButton::Select)) {
             TrackPose p = track_->respawn_pose(field_->second_state().position);
             field_->reset_second(p);

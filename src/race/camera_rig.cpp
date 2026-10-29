@@ -33,6 +33,19 @@ float stick(const PadState& pad, PadAxis a) {
 
 } // namespace
 
+LookDir stick_look(float rx, float ry, LookDir held) {
+    const float m = std::hypot(rx, ry);
+    // The direction one axis leads by at least k times the other (none for the stick forward).
+    auto dir = [&](float k) {
+        if (ry > 0 && ry >= k * std::fabs(rx)) return LookDir::Back;
+        if (std::fabs(rx) >= k * std::fabs(ry) && rx != 0) return rx < 0 ? LookDir::Left : LookDir::Right;
+        return LookDir::Ahead;
+    };
+    if (m < 0.35f) return LookDir::Ahead;
+    if (held != LookDir::Ahead && dir(1.0f) == held) return held;
+    return m < 0.5f ? LookDir::Ahead : dir(1.5f);
+}
+
 const char* camera_mode_name(CameraMode m) {
     switch (m) {
     case CameraMode::Chase: return "chase";
@@ -164,21 +177,32 @@ void CameraRig::update(const sim::VehicleState& s, const sim::VehicleSetup& setu
         float q = setup.wheels[0].ride_height > 0 ? setup.wheels[0].ride_height : 0.13f;
         render::Vec3 origin = rv(s.position + rotate(s.orientation, {0, q, 0}));
         render::Vec3 f, u;
+        const bool back = look_ == LookDir::Back;
+        const float side = look_ == LookDir::Left ? 1.0f : look_ == LookDir::Right ? -1.0f : 0.0f;
+        render::Vec3 r;
+        render::Vec3 e = point_[index] * -1.0f; // model frame: x right, y up, z back
         if (index == 1) { // chase: lagged yaw and pitch, no roll
             // Between 60 Hz steps (frame rates above 60) the lags carry on at their own rates:
             // held still, the view would turn on every other frame only (judder in fast turns).
             float yaw_now = lag_yaw_ + lag_yaw_w_ * float(lag_time_), pitch_now = lag_pitch_ + lag_pitch_w_ * float(lag_time_);
-            float th = yaw_now + (look_back_ ? kPi : 0.0f), ph = look_back_ ? -pitch_now : pitch_now;
+            float th = yaw_now + (back ? kPi : side * kPi * 0.5f), ph = back ? -pitch_now : side != 0 ? 0.0f : pitch_now;
             f = {-std::sin(th) * std::cos(ph), std::sin(ph), -std::cos(th) * std::cos(ph)};
-            render::Vec3 r = render::normalize(render::cross(f, {0, 1, 0}));
+            r = render::normalize(render::cross(f, {0, 1, 0}));
             u = render::cross(r, f);
+            r = render::normalize(render::cross(f, u));
         } else { // in-car: the body's attitude
             f = fwd, u = up;
-            if (look_back_) f = render::Vec3{0, 0, 0} - f;
+            r = render::normalize(render::cross(f, u));
+            if (back) f = render::Vec3{0, 0, 0} - f, r = render::Vec3{0, 0, 0} - r, e.z = -e.z;
         }
-        render::Vec3 r = render::normalize(render::cross(f, u));
-        render::Vec3 e = point_[index] * -1.0f; // model frame: x right, y up, z back
-        if (look_back_ && index == 0) e.z = -e.z;
+        if (side != 0 && index == 0) {
+            // Sideways from the driver's place: the eye in the forward frame, the view turned.
+            eye_ = origin + r * e.x + u * e.y - f * e.z;
+            f = r * -side;
+            view_ = render::look_at(eye_, eye_ + f, u);
+            fovy_ = 2.0f * std::atan(224.0f / (320.0f * 1.7320508f));
+            return;
+        }
         eye_ = origin + r * e.x + u * e.y - f * e.z;
         view_ = render::look_at(eye_, eye_ + f, u);
         fovy_ = 2.0f * std::atan(224.0f / (320.0f * 1.7320508f));

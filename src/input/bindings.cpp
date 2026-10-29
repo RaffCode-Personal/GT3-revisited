@@ -347,7 +347,7 @@ void add_modern_race_pad(Profile& p) {
     p.add("L2", "pad.west | pad.paddle2");          // shift down
     p.add("Circle", "pad.east");                    // handbrake
     p.add("R1", "pad.north");                       // change view
-    p.add("L1", "pad.rightstick | pad.righty+ threshold=0.5"); // look back (R3, or the right stick pulled back)
+    p.add("L1", "pad.rightstick");                  // look back (the right stick looks too: race::stick_look)
     p.add("Triangle", "pad.leftshoulder");          // reverse
     p.add("Start", "pad.start");                    // pause
     p.add("Left", "pad.dpleft");

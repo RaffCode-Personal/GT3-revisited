@@ -686,7 +686,7 @@ void RaceScreen::render_drive(App& app, Ui& ui) {
     lamps_.draw(ui.renderer(), rect, camera_.view(), eye, camera_.fovy(), occl, flare_lines);
     if (car_lamps_.active())
         car_lamps_.draw(ui.renderer(), rect, camera_.view(), eye, camera_.fovy(), lamp_cars(), occl, flare_lines);
-    if (!replaying_ && camera_.onboard() && camera_.mirror() && !camera_.look_back() && (!split || horizontal))
+    if (!replaying_ && camera_.onboard() && camera_.mirror() && !camera_.looking_away() && (!split || horizontal))
         draw_mirror(app, ui, rect, o, false, split);
     if (split) {
         if (!view2_) view2_ = std::make_unique<render::View3D>(*app.gpu());
@@ -695,7 +695,7 @@ void RaceScreen::render_drive(App& app, Ui& ui) {
                       smoke_view(camera2_, rect2.w / rect2.h, camera2_.fovy())); // in-car: own car not drawn
         view2_->draw(ui.renderer(), rect2, camera2_.view(), camera2_.projection(rect2.w / rect2.h), eye2, items_, o);
         sun_.draw(ui.renderer(), rect2, camera2_.view(), camera2_.fovy(), sun_visibility(eye2, camera2_.fovy(), rect2.h));
-        if (horizontal && !replaying_ && camera2_.onboard() && camera2_.mirror() && !camera2_.look_back())
+        if (horizontal && !replaying_ && camera2_.onboard() && camera2_.mirror() && !camera2_.looking_away())
             draw_mirror(app, ui, rect2, o, true, true);
     }
     } // (the flat views)
